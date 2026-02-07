@@ -1,50 +1,32 @@
-import google.generativeai as genai
+from langchain_groq import ChatGroq
 import os
 from dotenv import load_dotenv
 import json
 
 load_dotenv()
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-
-class GeminiService:
+class GeminiService:  # Keeping the class name for compatibility
     def __init__(self):
-        # List available models and print them for debugging
-        print("=== Available Gemini Models ===")
+        print("=== Initializing Groq LLM ===")
+        
+        groq_api_key = os.getenv("GROQ_API_KEY")
+        if not groq_api_key:
+            raise Exception("GROQ_API_KEY not found in environment variables")
+        
         try:
-            for m in genai.list_models():
-                if 'generateContent' in m.supported_generation_methods:
-                    print(f"Model: {m.name}")
+            self.llm = ChatGroq(
+                temperature=0,
+                groq_api_key=groq_api_key,
+                model_name="llama-3.3-70b-versatile"
+            )
+            
+            # Test if it works
+            test_response = self.llm.invoke("Say 'OK' if you can hear me.")
+            print(f"✓ Successfully initialized Groq with llama-3.3-70b-versatile")
+            print(f"Test response: {test_response.content}")
         except Exception as e:
-            print(f"Could not list models: {e}")
-        print("================================")
-        
-        # Updated list to try the NEW models that are actually available
-        model_names_to_try = [
-            'models/gemini-2.5-flash',  # Newest and fastest
-            'models/gemini-2.5-pro',    # Most capable
-            'models/gemini-2.0-flash',  # Alternative
-            'models/gemini-flash-latest',  # Generic latest
-            'models/gemini-pro-latest',    # Generic latest pro
-            'gemini-2.5-flash',
-            'gemini-2.0-flash',
-        ]
-        
-        self.model = None
-        for model_name in model_names_to_try:
-            try:
-                print(f"Trying model: {model_name}")
-                self.model = genai.GenerativeModel(model_name)
-                # Test if it works
-                test_response = self.model.generate_content("Say 'OK' if you can hear me.")
-                print(f"✓ Successfully initialized with model: {model_name}")
-                break
-            except Exception as e:
-                print(f"✗ Failed with {model_name}: {e}")
-                continue
-        
-        if self.model is None:
-            raise Exception("Could not initialize any Gemini model. Check your API key and model availability.")
+            print(f"✗ Failed to initialize Groq: {e}")
+            raise Exception(f"Could not initialize Groq LLM. Check your API key: {e}")
         
         self.default_questions = [
             "Tell me about yourself and your background.",
@@ -78,8 +60,8 @@ Return ONLY a JSON array of 5 questions, nothing else. Format:
 """
         
         try:
-            response = self.model.generate_content(prompt)
-            questions_text = response.text.strip()
+            response = self.llm.invoke(prompt)
+            questions_text = response.content.strip()
             
             # Remove markdown code fences if present
             questions_text = questions_text.replace("```json", "").replace("```", "").strip()
@@ -113,8 +95,8 @@ Return ONLY a JSON array of 5 questions, nothing else. Format:
 """
         
         try:
-            response = self.model.generate_content(prompt)
-            questions_text = response.text.strip()
+            response = self.llm.invoke(prompt)
+            questions_text = response.content.strip()
             
             # Remove markdown code fences
             questions_text = questions_text.replace("```json", "").replace("```", "").strip()
@@ -131,7 +113,7 @@ Return ONLY a JSON array of 5 questions, nothing else. Format:
             return self.default_questions
     
     def process_voice_command(self, command):
-        """Process voice commands using Gemini AI"""
+        """Process voice commands using Groq AI"""
         prompt = f"""
 You are an AI interview assistant. The user said: "{command}"
 
@@ -149,8 +131,8 @@ Be conversational and friendly. Keep messages under 20 words.
 """
         
         try:
-            response = self.model.generate_content(prompt)
-            result_text = response.text.strip()
+            response = self.llm.invoke(prompt)
+            result_text = response.content.strip()
             
             # Remove markdown
             result_text = result_text.replace("```json", "").replace("```", "").strip()
@@ -185,5 +167,5 @@ Please provide:
 Format your response as JSON with keys: summary, strengths (array), weaknesses (array), communication_score (number)
 """
         
-        response = self.model.generate_content(prompt)
-        return response.text
+        response = self.llm.invoke(prompt)
+        return response.content
